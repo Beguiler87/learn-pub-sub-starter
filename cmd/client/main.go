@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 	"strings"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
@@ -26,15 +24,59 @@ func main() {
 		}
 	}()
 	un, err := gamelogic.ClientWelcome()
+	if err != nil {
+		log.Fatalf("welcome error: %v", err)
+	}
 	userN := strings.ToLower(un)
 	queueN := "pause." + userN
 	ch, q, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, queueN, routing.PauseKey, pubsub.Transient)
 	if err != nil {
 		log.Fatalf("declare/bind error: %v", err)
 	}
+	gs := gamelogic.NewGameState(userN)
 	defer ch.Close()
+	for {
+		parts := gamelogic.GetInput()
+		if len(parts) == 0 {
+			continue
+		}
+		cmd, words := parts[0], parts[1:]
+		if cmd == "" {
+			continue
+		}
+		switch cmd {
+		case "spawn":
+			if len(words) != 2 {
+				fmt.Println("usage: spawn <location> <unitType>")
+				break
+			}
+			if err := gs.CommandSpawn(append([]string{"spawn"}, words...)); err != nil {
+				log.Printf("Error encountered: %v", err)
+				break
+			}
+		case "move":
+			if len(words) < 2 {
+				fmt.Println("usage: move <destination> <unitID>")
+				break
+			}
+			if _, err := gs.CommandMove(append([]string{"move"}, words...)); err != nil {
+				log.Printf("Error encountered: %v", err)
+				break
+			}
+			fmt.Println("Move successful")
+		case "status":
+			gs.CommandStatus()
+		case "help":
+			gamelogic.PrintClientHelp()
+		case "spam":
+			fmt.Println("Spamming is not allowed yet!")
+		case "quit":
+			gamelogic.PrintQuit()
+			return
+		default:
+			fmt.Println("Unknown command")
+		}
+	}
 	_ = q
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt)
-	<-sig
+	_ = queueN
 }

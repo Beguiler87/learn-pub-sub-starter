@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
+	"time"
 
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 
@@ -40,12 +40,49 @@ func main() {
 		false,
 		nil,
 	)
-	payload := routing.PlayingState{IsPaused: true}
-	if err := pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, payload); err != nil {
-		log.Printf("publish error: %v", err)
+	if err != nil {
+		log.Fatalf("exchange declare error: %v", err)
 	}
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt)
-	<-sigChan
-	fmt.Println("Closing program...")
+	gamelogic.PrintServerHelp()
+	for {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
+		switch words[0] {
+		case "pause":
+			gamelogic.WriteLog(routing.GameLog{
+				CurrentTime: time.Now(),
+				Message:     "sending pause",
+				Username:    "server",
+			})
+			payload := routing.PlayingState{IsPaused: true}
+			if err := pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, payload); err != nil {
+				log.Printf("publish error: %v", err)
+			}
+		case "resume":
+			gamelogic.WriteLog(routing.GameLog{
+				CurrentTime: time.Now(),
+				Message:     "sending resume",
+				Username:    "server",
+			})
+			payload := routing.PlayingState{IsPaused: false}
+			if err := pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, payload); err != nil {
+				log.Printf("publish error: %v", err)
+			}
+		case "quit":
+			gamelogic.WriteLog(routing.GameLog{
+				CurrentTime: time.Now(),
+				Message:     "sending quit",
+				Username:    "server",
+			})
+			break
+		default:
+			gamelogic.WriteLog(routing.GameLog{
+				CurrentTime: time.Now(),
+				Message:     "sending unknown command",
+				Username:    "server",
+			})
+		}
+	}
 }
