@@ -43,6 +43,39 @@ func main() {
 	if err != nil {
 		log.Fatalf("exchange declare error: %v", err)
 	}
+	err = ch.ExchangeDeclare(
+		"peril_topic",
+		"topic",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("exchange declare error: %v", err)
+	}
+	_, err = ch.QueueDeclare(
+		"game_logs",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("queue declare error: %v", err)
+	}
+	err = ch.QueueBind(
+		"game_logs",
+		routing.GameLogSlug+".*",
+		routing.ExchangePerilTopic,
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("queue bind error: %v", err)
+	}
 	gamelogic.PrintServerHelp()
 	for {
 		words := gamelogic.GetInput()
