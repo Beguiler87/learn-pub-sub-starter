@@ -55,28 +55,23 @@ func main() {
 	if err != nil {
 		log.Fatalf("exchange declare error: %v", err)
 	}
-	_, err = ch.QueueDeclare(
-		"game_logs",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		log.Fatalf("queue declare error: %v", err)
-	}
-	err = ch.QueueBind(
+	err = pubsub.SubscribeGob[routing.GameLog](
+		conn,
+		routing.ExchangePerilTopic,
 		"game_logs",
 		routing.GameLogSlug+".*",
-		routing.ExchangePerilTopic,
-		false,
-		nil,
+		pubsub.SimpleQueueDurable,
+		func(gl routing.GameLog) pubsub.AckType {
+			defer fmt.Print("> ")
+			gamelogic.WriteLog(gl)
+			return pubsub.Ack
+		},
 	)
 	if err != nil {
-		log.Fatalf("queue bind error: %v", err)
+		log.Fatalf("subscribe error: %v", err)
 	}
 	gamelogic.PrintServerHelp()
+	quit := false
 	for {
 		words := gamelogic.GetInput()
 		if len(words) == 0 {
@@ -109,13 +104,16 @@ func main() {
 				Message:     "sending quit",
 				Username:    "server",
 			})
-			break
+			quit = true
 		default:
 			gamelogic.WriteLog(routing.GameLog{
 				CurrentTime: time.Now(),
 				Message:     "sending unknown command",
 				Username:    "server",
 			})
+		}
+		if quit {
+			break
 		}
 	}
 }

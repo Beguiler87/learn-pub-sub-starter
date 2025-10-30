@@ -1,7 +1,9 @@
 package pubsub
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"encoding/json"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -25,35 +27,21 @@ func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	)
 }
 
-type SimpleQueueType int
-
-const (
-	Durable SimpleQueueType = iota
-	Transient
-)
-
-func DeclareAndBind(conn *amqp.Connection, exchange, queueName, key string, queueType SimpleQueueType) (*amqp.Channel, amqp.Queue, error) {
-	ch, err := conn.Channel()
-	if err != nil {
-		return nil, amqp.Queue{}, err
+func PublishGob[T any](ch *amqp.Channel, exchange, key string, val T) error {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(val); err != nil {
+		return err
 	}
-	durable := (queueType == Durable)
-	autoDelete := (queueType == Transient)
-	exclusive := (queueType == Transient)
-	q, err := ch.QueueDeclare(
-		queueName,
-		durable,
-		autoDelete,
-		exclusive,
+	return ch.PublishWithContext(
+		context.Background(),
+		exchange,
+		key,
 		false,
-		nil)
-	if err != nil {
-		ch.Close()
-		return nil, amqp.Queue{}, err
-	}
-	if err := ch.QueueBind(queueName, key, exchange, false, nil); err != nil {
-		ch.Close()
-		return nil, amqp.Queue{}, err
-	}
-	return ch, q, nil
+		false,
+		amqp.Publishing{
+			ContentType: "application/gob",
+			Body:        buf.Bytes(),
+		},
+	)
 }
