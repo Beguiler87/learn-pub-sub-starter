@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -94,6 +96,29 @@ func main() {
 				log.Printf("published move to %s", "army_moves."+username)
 			}
 			fmt.Println("Move successful")
+		case "spam":
+			if len(words) < 1 {
+				fmt.Println("usage: spam <number>")
+				break
+			}
+			n, err := strconv.Atoi(words[0])
+			if err != nil || n <= 0 {
+				fmt.Println("usage: spam <number>")
+				break
+			}
+			for i := 0; i < n; i++ {
+				msg := gamelogic.GetMaliciousLog()
+				logMsg := routing.GameLog{
+					CurrentTime: time.Now(),
+					Message:     msg,
+					Username:    username,
+				}
+				err := pubsub.PublishJSON(ch, routing.ExchangePerilTopic, "game_logs."+username, logMsg)
+				if err != nil {
+					log.Printf("publish error: %v", err)
+				}
+				log.Printf("published game log %d to %s", i+1, "game_logs."+username)
+			}
 		case "status":
 			gs.CommandStatus()
 		case "help":

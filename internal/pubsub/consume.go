@@ -86,6 +86,9 @@ func subscribe[T any](conn *amqp.Connection, exchange, queueName, key string, qu
 	if err != nil {
 		return fmt.Errorf("could not declare and bind queue: %v", err)
 	}
+	if err := ch.Qos(10, 0, false); err != nil {
+		return fmt.Errorf("set qos prefetch: %w", err)
+	}
 	deliveries, err := ch.Consume(
 		queue.Name,
 		"",
